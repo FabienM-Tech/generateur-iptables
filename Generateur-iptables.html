@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Générateur de règles iptables</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--ink:#1f2933;--muted:#647084;--line:#e2e8f0;--accent:#2f7d4f;--accent-soft:#e6f4ec;--code:#0d2216;--codetxt:#d4f0df;--warn:#c0392b}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+header{background:linear-gradient(135deg,#1f4d33,#2f7d4f);color:#fff;padding:26px 24px}
+.wrap{max-width:920px;margin:0 auto;padding:0 20px}
+header h1{margin:0;font-size:1.45rem}
+header p{margin:6px 0 0;color:#c4e6d3;font-size:.9rem}
+.back{display:inline-block;margin:14px 0 0;color:#c4e6d3;text-decoration:none;font-size:.85rem}
+.back:hover{color:#fff}
+main{padding:22px 0 60px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;margin:16px 0;padding:20px 22px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.card h2{margin:0 0 4px;font-size:1.12rem;color:var(--accent)}
+.card .sub{margin:0 0 16px;color:var(--muted);font-size:.86rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
+.zone{border:1px solid var(--line);border-radius:10px;padding:14px;background:#fbfdfc}
+.zone h3{margin:0 0 10px;font-size:.9rem}
+label.f{display:block;margin:0 0 10px}
+label.f span{display:block;font-size:.76rem;color:var(--muted);margin-bottom:3px;font-weight:600}
+input,select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:7px;font-size:.88rem;font-family:inherit;background:#fff}
+input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+input:disabled{background:#f1f5f4;color:#9aa7b2}
+.row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:6px}
+.opts{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px}
+.opts label{display:flex;align-items:center;gap:7px;font-size:.85rem;cursor:pointer}
+.opts input{width:auto}
+.actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:.9rem;font-weight:600;cursor:pointer}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:none;color:var(--muted);border:1px solid var(--line)}
+.btn.ghost:hover{border-color:var(--accent);color:var(--accent)}
+.out{position:relative;display:block;background:var(--code);color:var(--codetxt);padding:38px 16px 15px;border-radius:9px;font-family:"SF Mono",Consolas,Monaco,monospace;font-size:.82rem;line-height:1.6;margin:16px 0 0;overflow-x:auto;white-space:pre;min-height:64px}
+.out::before{content:"bash";position:absolute;top:0;left:0;right:0;height:28px;line-height:28px;text-align:center;font-size:.7rem;letter-spacing:.5px;color:rgba(255,255,255,.45);background:rgba(0,0,0,.3);border-radius:9px 9px 0 0;border-bottom:1px solid rgba(255,255,255,.08)}
+.out::after{content:"";position:absolute;top:10px;left:13px;width:9px;height:9px;border-radius:50%;background:#ff5f56;box-shadow:16px 0 #ffbd2e,32px 0 #27c93f}
+.out .c{color:rgba(255,255,255,.42)}
+.tip{background:var(--accent-soft);border-left:3px solid var(--accent);padding:10px 14px;border-radius:6px;font-size:.84rem;margin:12px 0 0}
+.err{color:var(--warn);font-size:.83rem;margin-top:8px;min-height:1em}
+@media(max-width:640px){.grid{grid-template-columns:1fr}.row{grid-template-columns:1fr}}
+footer{text-align:center;color:var(--muted);font-size:.8rem;padding:20px}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+<h1>🧱 Générateur de règles iptables</h1>
+<p>Renseigne les zones, interfaces et le service : l'outil génère les règles (aller + retour) prêtes à copier.</p>
+<a class="back" href="../index.html">← Retour à l'index</a>
+</div></header>
+<main class="wrap">
+
+<div class="card">
+<h2>Autoriser un flux</h2>
+<p class="sub">Ex. : SSH depuis la DMZ vers le LAN. On suppose une politique par défaut DROP (on ajoute donc les ACCEPT nécessaires).</p>
+
+<div class="row">
+<label class="f"><span>Service courant (pré-remplit protocole + port)</span>
+<select id="svc" onchange="applyService()">
+<option value="">— Personnalisé —</option>
+<option value="ssh">SSH (22 / tcp)</option>
+<option value="http">HTTP (80 / tcp)</option>
+<option value="https">HTTPS (443 / tcp)</option>
+<option value="web">Web HTTP+HTTPS (80,443 / tcp)</option>
+<option value="dns">DNS (53 / udp)</option>
+<option value="dhcp">DHCP (67,68 / udp)</option>
+<option value="ftp">FTP (21 / tcp)</option>
+<option value="smtp">SMTP (25 / tcp)</option>
+<option value="smtps">SMTP soumission (587 / tcp)</option>
+<option value="pop3">POP3 (110 / tcp)</option>
+<option value="imap">IMAP (143 / tcp)</option>
+<option value="imaps">IMAPS (993 / tcp)</option>
+<option value="ldap">LDAP (389 / tcp)</option>
+<option value="ldaps">LDAPS (636 / tcp)</option>
+<option value="kerberos">Kerberos (88 / tcp)</option>
+<option value="smb">SMB / partage (445 / tcp)</option>
+<option value="rdp">RDP bureau distant (3389 / tcp)</option>
+<option value="mysql">MySQL / MariaDB (3306 / tcp)</option>
+<option value="snmp">SNMP (161 / udp)</option>
+<option value="ntp">NTP (123 / udp)</option>
+<option value="sip">VoIP SIP (5060 / udp)</option>
+<option value="ping">Ping / ICMP</option>
+</select></label>
+<label class="f"><span>Type de trafic</span>
+<select id="chain">
+<option value="FORWARD">Routé entre zones (FORWARD)</option>
+<option value="INPUT">Vers le pare-feu (INPUT)</option>
+<option value="OUTPUT">Depuis le pare-feu (OUTPUT)</option>
+</select></label>
+<label class="f"><span>Action</span>
+<select id="action"><option value="ACCEPT">ACCEPT (autoriser)</option><option value="REJECT">REJECT (refuser + réponse)</option><option value="DROP">DROP (jeter silencieux)</option></select></label>
+</div>
+
+<div class="grid">
+<div class="zone">
+<h3>🟠 Source</h3>
+<label class="f"><span>Nom (repère)</span><input id="sName" placeholder="DMZ"></label>
+<label class="f"><span>Interface d'entrée</span><input id="sIf" placeholder="eth1"></label>
+<label class="f"><span>IP / réseau source</span><input id="sIp" placeholder="192.168.20.0/24"></label>
+</div>
+<div class="zone">
+<h3>🟢 Destination</h3>
+<label class="f"><span>Nom (repère)</span><input id="dName" placeholder="LAN"></label>
+<label class="f"><span>Interface de sortie</span><input id="dIf" placeholder="eth0"></label>
+<label class="f"><span>IP / réseau destination</span><input id="dIp" placeholder="192.168.10.0/24"></label>
+</div>
+</div>
+
+<div class="row">
+<label class="f"><span>Protocole</span>
+<select id="proto"><option value="tcp">TCP</option><option value="udp">UDP</option><option value="icmp">ICMP (ping)</option><option value="all">Tous</option></select></label>
+<label class="f"><span>Port(s) — ex. 22 · 80,443 · 1000:2000</span><input id="ports" placeholder="22"></label>
+<div></div>
+</div>
+
+<div class="opts">
+<label><input type="checkbox" id="stateful" checked> Générer la règle de retour <span style="color:var(--muted)">(décoche si règle globale ESTABLISHED existe)</span></label>
+<label><input type="checkbox" id="sudo" checked> Préfixer avec sudo</label>
+<label><input type="checkbox" id="log"> Journaliser (LOG)</label>
+<label><input type="checkbox" id="comment" checked> Commentaires</label>
+<label><input type="checkbox" id="masq"> MASQUERADE (partage Internet)</label>
+</div>
+
+<div class="tip" style="margin-top:14px"><b>Deux approches, à ne pas cumuler :</b> soit une règle d'état <u>globale</u> en tête de chaîne <code>iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT</code> (et alors une seule règle <code>NEW</code> par service suffit → décoche « retour »), soit une règle de <u>retour par flux</u> (case cochée). Faire les deux est redondant.</div>
+
+<div class="actions">
+<button class="btn" onclick="genFilter()">Générer les règles</button>
+<button class="btn ghost" onclick="copyOut('outA',this)">Copier</button>
+<button class="btn ghost" onclick="dlOut('outA')">Télécharger .sh</button>
+</div>
+<div class="err" id="errA"></div>
+<pre class="out" id="outA"><span class="c"># Les règles apparaîtront ici…</span></pre>
+</div>
+
+<div class="card">
+<h2>Redirection de port (DNAT)</h2>
+<p class="sub">Publier un service interne vers l'extérieur. Ex. : port public 80 → serveur web en DMZ.</p>
+<div class="row">
+<label class="f"><span>Interface publique (entrée)</span><input id="nIf" placeholder="eth0"></label>
+<label class="f"><span>Protocole</span><select id="nProto"><option value="tcp">TCP</option><option value="udp">UDP</option></select></label>
+<label class="f"><span>Port public</span><input id="nPubPort" placeholder="80"></label>
+</div>
+<div class="row">
+<label class="f"><span>IP interne (cible)</span><input id="nDstIp" placeholder="192.168.20.10"></label>
+<label class="f"><span>Port interne</span><input id="nDstPort" placeholder="80"></label>
+<label class="f"><span>Interface interne (sortie, option)</span><input id="nOutIf" placeholder="eth1"></label>
+</div>
+<div class="opts">
+<label><input type="checkbox" id="sudoB" checked> Préfixer avec sudo</label>
+</div>
+<div class="actions">
+<button class="btn" onclick="genDnat()">Générer la redirection</button>
+<button class="btn ghost" onclick="copyOut('outB',this)">Copier</button>
+<button class="btn ghost" onclick="dlOut('outB')">Télécharger .sh</button>
+</div>
+<div class="err" id="errB"></div>
+<pre class="out" id="outB"><span class="c"># Les règles apparaîtront ici…</span></pre>
+</div>
+
+<div class="tip"><b>Rappel :</b> pour tout trafic routé (FORWARD) ou une DNAT, active le routage IP : <code>sudo sysctl -w net.ipv4.ip_forward=1</code> (persistant dans <code>/etc/sysctl.d/99-routing.conf</code>). Teste toujours tes règles avant de les rendre permanentes.</div>
+
+</main>
+<footer>Générateur de règles iptables · Révision Bloc 1</footer>
+
+<script>
+const rawOut={outA:'',outB:''};
+const SVC={ssh:['tcp','22'],http:['tcp','80'],https:['tcp','443'],web:['tcp','80,443'],dns:['udp','53'],dhcp:['udp','67,68'],ftp:['tcp','21'],smtp:['tcp','25'],smtps:['tcp','587'],pop3:['tcp','110'],imap:['tcp','143'],imaps:['tcp','993'],ldap:['tcp','389'],ldaps:['tcp','636'],kerberos:['tcp','88'],smb:['tcp','445'],rdp:['tcp','3389'],mysql:['tcp','3306'],snmp:['udp','161'],ntp:['udp','123'],sip:['udp','5060'],ping:['icmp','']};
+function v(id){return document.getElementById(id).value.trim();}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function validIp(s){const m=s.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?:\/(\d{1,2}))?$/);if(!m)return false;for(let i=1;i<=4;i++){if(+m[i]>255)return false;}if(m[5]!==undefined&&+m[5]>32)return false;return true;}
+function validPorts(p){return /^[0-9]{1,5}([,:][0-9]{1,5})*$/.test(p.replace(/\s+/g,''));}
+function portArgs(proto,ports,dir){if(proto!=='tcp'&&proto!=='udp')return [];if(!ports)return [];const p=ports.replace(/\s+/g,'');if(p.indexOf(',')>=0)return ['-m','multiport','--'+dir+'ports',p];return ['--'+dir+'port',p];}
+function syncPorts(){const p=document.getElementById('proto').value;const dis=(p==='icmp'||p==='all');const el=document.getElementById('ports');el.disabled=dis;if(dis)el.value='';}
+function applyService(){const k=document.getElementById('svc').value;if(!k||!SVC[k])return;const s=SVC[k];document.getElementById('proto').value=s[0];const el=document.getElementById('ports');const dis=(s[0]==='icmp'||s[0]==='all');el.disabled=dis;el.value=dis?'':s[1];}
+function render(id,lines){rawOut[id]=lines.join('\n');const html=lines.map(function(l){const e=esc(l);return l.trim().charAt(0)==='#'?'<span class="c">'+e+'</span>':e;}).join('\n');document.getElementById(id).innerHTML=html||'<span class="c"># (rien à générer)</span>';}
+
+function genFilter(){
+ const chain=v('chain'),sName=v('sName'),sIf=v('sIf'),sIp=v('sIp'),dName=v('dName'),dIf=v('dIf'),dIp=v('dIp');
+ const proto=v('proto'),ports=v('ports'),action=v('action');
+ const stateful=document.getElementById('stateful').checked,log=document.getElementById('log').checked,comment=document.getElementById('comment').checked,masq=document.getElementById('masq').checked;
+ const SUDO=document.getElementById('sudo').checked?'sudo ':'';
+ const errs=[];
+ if((proto==='tcp'||proto==='udp')&&ports&&!validPorts(ports))errs.push('Format de port invalide.');
+ if(sIp&&!validIp(sIp))errs.push('Source IP invalide.');
+ if(dIp&&!validIp(dIp))errs.push('Destination IP invalide.');
+ if(chain==='FORWARD'&&!sIf&&!dIf)errs.push('Indique au moins une interface.');
+ document.getElementById('errA').textContent=errs.join(' ');
+ const label=(sName||'src')+' -> '+(dName||'dst');
+ const ifA=[],ipA=[],ppA=[];
+ if(chain==='FORWARD'){if(sIf)ifA.push('-i',sIf);if(dIf)ifA.push('-o',dIf);}
+ else if(chain==='INPUT'){if(sIf)ifA.push('-i',sIf);}
+ else if(chain==='OUTPUT'){if(dIf)ifA.push('-o',dIf);}
+ if(sIp)ipA.push('-s',sIp);
+ if(dIp)ipA.push('-d',dIp);
+ if(proto!=='all')ppA.push('-p',proto);
+ if(proto==='icmp')ppA.push('--icmp-type','echo-request');
+ const pAller=portArgs(proto,ports,'d');
+ const lines=[];
+ if(chain==='FORWARD')lines.push('# Flux route '+label+' (necessite net.ipv4.ip_forward=1)');
+ else lines.push('# Flux '+chain+' : '+label);
+ if(log){const lg=['iptables','-A',chain].concat(ifA,ipA,ppA,pAller,['-j','LOG','--log-prefix','"IPT '+label+': "']);lines.push(SUDO+lg.join(' '));}
+ let aller=['iptables','-A',chain].concat(ifA,ipA,ppA,pAller);
+ if(action==='ACCEPT')aller=aller.concat(['-m','conntrack','--ctstate','NEW']);
+ if(comment)aller=aller.concat(['-m','comment','--comment','"'+label+'"']);
+ aller.push('-j',action);
+ lines.push(SUDO+aller.join(' '));
+ if(action==='ACCEPT'&&stateful){
+  lines.push('# Retour (connexions etablies)');
+  let rChain,rIf=[],rIp=[];
+  if(chain==='FORWARD'){rChain='FORWARD';if(dIf)rIf.push('-i',dIf);if(sIf)rIf.push('-o',sIf);if(dIp)rIp.push('-s',dIp);if(sIp)rIp.push('-d',sIp);}
+  else if(chain==='INPUT'){rChain='OUTPUT';if(sIf)rIf.push('-o',sIf);if(sIp)rIp.push('-d',sIp);}
+  else{rChain='INPUT';if(dIf)rIf.push('-i',dIf);if(dIp)rIp.push('-s',dIp);}
+  const rpp=[];if(proto!=='all')rpp.push('-p',proto);if(proto==='icmp')rpp.push('--icmp-type','echo-reply');
+  const pRet=portArgs(proto,ports,'s');
+  let ret=['iptables','-A',rChain].concat(rIf,rIp,rpp,pRet,['-m','conntrack','--ctstate','ESTABLISHED,RELATED','-j','ACCEPT']);
+  lines.push(SUDO+ret.join(' '));
+ }
+ if(masq&&chain==='FORWARD'){
+  lines.push('# Partage de connexion (NAT sortant)');
+  let m=['iptables','-t','nat','-A','POSTROUTING'];if(dIf)m.push('-o',dIf);if(sIp)m.push('-s',sIp);m.push('-j','MASQUERADE');
+  lines.push(SUDO+m.join(' '));
+ }
+ render('outA',lines);
+}
+
+function genDnat(){
+ const nIf=v('nIf'),nProto=v('nProto'),nPubPort=v('nPubPort'),nDstIp=v('nDstIp'),nDstPort=v('nDstPort'),nOutIf=v('nOutIf');
+ const SUDO=document.getElementById('sudoB').checked?'sudo ':'';
+ const errs=[];
+ if(!nPubPort||!validPorts(nPubPort))errs.push('Port public invalide.');
+ if(!nDstPort||!validPorts(nDstPort))errs.push('Port interne invalide.');
+ if(!nDstIp||!validIp(nDstIp))errs.push('IP interne invalide.');
+ document.getElementById('errB').textContent=errs.join(' ');
+ const lines=['# Redirection '+nProto+'/'+nPubPort+' -> '+nDstIp+':'+nDstPort+' (necessite ip_forward=1)'];
+ let pre=['iptables','-t','nat','-A','PREROUTING'];if(nIf)pre.push('-i',nIf);pre.push('-p',nProto,'--dport',nPubPort,'-j','DNAT','--to-destination',nDstIp+':'+nDstPort);
+ lines.push(SUDO+pre.join(' '));
+ lines.push('# Autoriser le flux route vers la cible');
+ let fw=['iptables','-A','FORWARD'];if(nIf)fw.push('-i',nIf);if(nOutIf)fw.push('-o',nOutIf);fw.push('-d',nDstIp,'-p',nProto,'--dport',nDstPort,'-m','conntrack','--ctstate','NEW','-j','ACCEPT');
+ lines.push(SUDO+fw.join(' '));
+ lines.push('# Retour');
+ let rb=['iptables','-A','FORWARD'];if(nOutIf)rb.push('-i',nOutIf);if(nIf)rb.push('-o',nIf);rb.push('-s',nDstIp,'-p',nProto,'--sport',nDstPort,'-m','conntrack','--ctstate','ESTABLISHED,RELATED','-j','ACCEPT');
+ lines.push(SUDO+rb.join(' '));
+ render('outB',lines);
+}
+
+function copyOut(id,btn){const t=rawOut[id]||'';if(navigator.clipboard&&t){navigator.clipboard.writeText(t);if(btn){const o=btn.textContent;btn.textContent='Copié ✓';setTimeout(function(){btn.textContent=o;},1200);}}}
+function dlOut(id){const t=rawOut[id]||'';const blob=new Blob(['#!/bin/sh\n# Genere par le Generateur iptables\n'+t+'\n'],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(id==='outB'?'iptables-dnat.sh':'iptables-regles.sh');document.body.appendChild(a);a.click();a.remove();}
+document.getElementById('proto').addEventListener('change',syncPorts);
+</script>
+</body>
+</html>
